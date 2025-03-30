@@ -44,6 +44,22 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Add this function at the beginning of the script, after the color definitions
+check_pipe_execution() {
+    if [ -t 0 ]; then
+        return 0  # Not piped
+    else
+        echo -e "${RED}Error: This script cannot be run through a pipe.${NC}"
+        echo -e "${YELLOW}Please run it directly:${NC}"
+        echo -e "${CYAN}sudo ./minio-server-setup.sh${NC}"
+        echo -e "\n${YELLOW}Or download it first:${NC}"
+        echo -e "${CYAN}curl -O https://raw.githubusercontent.com/devserge/minio-server-setup/main/minio-server-setup.sh${NC}"
+        echo -e "${CYAN}chmod +x minio-server-setup.sh${NC}"
+        echo -e "${CYAN}sudo ./minio-server-setup.sh${NC}"
+        exit 1
+    fi
+}
+
 # Clear the terminal
 clear
 
@@ -81,6 +97,10 @@ echo
 echo -e "${PURPLE}Copyright (c) 2024 Serge Huijsen${NC}"
 echo -e "${PURPLE}License: MIT${NC}"
 echo
+
+# Add this line right after the intro section, before any user input
+check_pipe_execution
+
 read -p "Press Enter to continue or Ctrl+C to abort..."
 
 # Check if running as root
