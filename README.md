@@ -17,7 +17,14 @@ A comprehensive, interactive script for setting up a MinIO server with Nginx rev
 ## Quick Start
 
 ```bash
-curl -s https://raw.githubusercontent.com/devserge/minio-server-setup/main/minio-server-setup.sh | sudo bash
+# Download the script
+curl -O https://raw.githubusercontent.com/devserge/minio-server-setup/main/minio-server-setup.sh
+
+# Make it executable
+chmod +x minio-server-setup.sh
+
+# Run the script
+sudo ./minio-server-setup.sh
 ```
 
 ## Requirements
@@ -25,24 +32,6 @@ curl -s https://raw.githubusercontent.com/devserge/minio-server-setup/main/minio
 - Ubuntu 20.04 or later
 - Root privileges (sudo)
 - Public domain (for Let's Encrypt certificates)
-
-## Manual Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/devserge/minio-server-setup.git
-   cd minio-server-setup
-   ```
-
-2. Make the script executable:
-   ```bash
-   chmod +x minio-server-setup.sh
-   ```
-
-3. Run the script:
-   ```bash
-   sudo ./minio-server-setup.sh
-   ```
 
 ## What's included?
 
