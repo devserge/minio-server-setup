@@ -703,66 +703,26 @@ MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD"
 EOF
 echo -e "${GREEN}✓ MinIO configuration file created${NC}"
 
-# Function to check if Nginx is running
-check_nginx_running() {
-    if systemctl is-active --quiet nginx; then
-        return 0
-    fi
-    return 1
-}
-
-# Function to handle Nginx configuration
-handle_nginx_config() {
-    echo -e "\n${BLUE}=== Configuring Nginx ===${NC}"
-    
-    # Check if Nginx is already running
-    if check_nginx_running; then
-        echo -e "${YELLOW}Nginx is already running. Checking configuration...${NC}"
-        
-        # Test Nginx configuration
-        if nginx -t; then
-            echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
-            echo -e "${YELLOW}Reloading Nginx configuration...${NC}"
-            systemctl reload nginx
-            if [ $? -eq 0 ]; then
-                echo -e "${GREEN}✓ Nginx configuration reloaded successfully${NC}"
-                return 0
-            else
-                echo -e "${RED}Failed to reload Nginx configuration${NC}"
-                return 1
-            fi
-        else
-            echo -e "${RED}Invalid Nginx configuration. Please check the configuration files.${NC}"
-            return 1
-        fi
-    else
-        # If Nginx is not running, start it
-        echo -e "${YELLOW}Starting Nginx...${NC}"
-        systemctl enable nginx
-        systemctl start nginx
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✓ Nginx started successfully${NC}"
-            return 0
-        else
-            echo -e "${RED}Failed to start Nginx. Checking logs...${NC}"
-            journalctl -u nginx -n 50 | cat
-            return 1
-        fi
-    fi
-}
-
-# Replace the Nginx configuration section with:
-echo -e "\n${BLUE}=== Configuring Nginx ===${NC}"
+# Replace the console access and Nginx configuration section with this simpler version
+echo -e "\n${CYAN}MinIO Console Access:${NC}"
+echo -e "${YELLOW}Would you like to redirect your main domain to the MinIO Console?${NC}"
+echo -e "${YELLOW}This will make the console accessible at:${NC}"
+echo -e "  ${CYAN}• https://$DOMAIN_NAME (redirects to port 9001)${NC}"
+echo -e "  ${CYAN}• https://$DOMAIN_NAME:9001 (direct access)${NC}"
+read -p "Enable domain redirect? (y/n): " ENABLE_REDIRECT
 
 # Create Nginx configuration
+echo -e "\n${BLUE}=== Configuring Nginx ===${NC}"
 echo -e "${YELLOW}Creating Nginx configuration...${NC}"
 cat > /etc/nginx/sites-available/minio << EOF
+# HTTP redirect
 server {
     listen 80;
     server_name $DOMAIN_NAME;
     return 301 https://\$server_name\$request_uri;
 }
 
+# HTTPS main server (redirect to console)
 server {
     listen 443 ssl;
     server_name $DOMAIN_NAME;
@@ -772,35 +732,9 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
 
-    # MinIO Console
+    # Redirect to MinIO Console
     location / {
-        proxy_pass http://localhost:9001;
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-NginX-Proxy true;
-        proxy_connect_timeout 300;
-        proxy_send_timeout 300;
-        proxy_read_timeout 300;
-        proxy_buffering off;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    # MinIO API
-    location /api {
-        proxy_pass http://localhost:9000;
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-NginX-Proxy true;
-        proxy_connect_timeout 300;
-        proxy_send_timeout 300;
-        proxy_read_timeout 300;
-        proxy_buffering off;
+        return 301 https://\$server_name:9001;
     }
 }
 EOF
@@ -809,9 +743,36 @@ EOF
 echo -e "${YELLOW}Enabling Nginx site...${NC}"
 ln -sf /etc/nginx/sites-available/minio /etc/nginx/sites-enabled/
 
-# Handle Nginx configuration and service
-if ! handle_nginx_config; then
-    echo -e "${RED}Failed to configure Nginx. Please check the configuration and try again.${NC}"
+# Test Nginx configuration
+echo -e "${YELLOW}Testing Nginx configuration...${NC}"
+if nginx -t; then
+    echo -e "${GREEN}✓ Nginx configuration is valid${NC}"
+    
+    # Check if Nginx is running
+    if systemctl is-active --quiet nginx; then
+        echo -e "${YELLOW}Nginx is running. Reloading configuration...${NC}"
+        systemctl reload nginx
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✓ Nginx configuration reloaded successfully${NC}"
+        else
+            echo -e "${RED}Failed to reload Nginx. Checking logs...${NC}"
+            journalctl -u nginx -n 50 | cat
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}Nginx is not running. Starting service...${NC}"
+        systemctl enable nginx
+        systemctl start nginx
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✓ Nginx started successfully${NC}"
+        else
+            echo -e "${RED}Failed to start Nginx. Checking logs...${NC}"
+            journalctl -u nginx -n 50 | cat
+            exit 1
+        fi
+    fi
+else
+    echo -e "${RED}Invalid Nginx configuration. Please check the configuration files.${NC}"
     exit 1
 fi
 
@@ -840,8 +801,11 @@ echo -e "${BLUE}╚════════════════════�
 echo
 echo -e "${CYAN}Your MinIO server is now set up with the following details:${NC}"
 echo -e "${YELLOW}• Domain:${NC} $DOMAIN_NAME"
-echo -e "${YELLOW}• MinIO API:${NC} https://$DOMAIN_NAME"
+echo -e "${YELLOW}• MinIO API:${NC} https://$DOMAIN_NAME:9000"
 echo -e "${YELLOW}• MinIO Console:${NC} https://$DOMAIN_NAME:9001"
+if [ "$ENABLE_REDIRECT" = "y" ]; then
+    echo -e "${YELLOW}• Domain Redirect:${NC} https://$DOMAIN_NAME → https://$DOMAIN_NAME:9001"
+fi
 echo -e "${YELLOW}• Admin User:${NC} $MINIO_ROOT_USER"
 echo -e "${YELLOW}• Admin Password:${NC} $MINIO_ROOT_PASSWORD"
 echo -e "${YELLOW}• Data Directory:${NC} $DATA_DIR"
